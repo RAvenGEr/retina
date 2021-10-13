@@ -1,6 +1,6 @@
 [package]
 name = "retina"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Scott Lamb <slamb@slamb.org>"]
 license = "MIT/Apache-2.0"
 edition = "2018"
@@ -14,7 +14,7 @@ include = ["src/**/*", "benches", "Cargo.toml"]
 base64 = "0.13.0"
 bitreader = "0.3.3"
 bytes = "1.0.1"
-digest_auth = "0.3.0"
+digest-access = "0.3.0"
 futures = "0.3.14"
 hex = "0.4.3"
 h264-reader = "0.5.0"

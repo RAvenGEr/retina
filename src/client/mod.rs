@@ -7,7 +7,7 @@ use std::num::NonZeroU32;
 use std::sync::{Arc, Mutex};
 use std::task::Poll;
 use std::time::Instant;
-use std::{borrow::Cow, fmt::Debug, num::NonZeroU16, pin::Pin};
+use std::{fmt::Debug, num::NonZeroU16, pin::Pin};
 
 use self::channel_mapping::*;
 pub use self::timeline::Timeline;
@@ -656,7 +656,7 @@ struct SessionInner {
     runtime_handle: Option<tokio::runtime::Handle>,
 
     options: SessionOptions,
-    requested_auth: Option<digest_auth::WwwAuthenticateHeader>,
+    requested_auth: Option<digest_access::DigestAccess>,
     presentation: Presentation,
 
     /// This will be set iff one or more `SETUP` calls have been issued.
@@ -727,7 +727,7 @@ impl RtspConnection {
         &mut self,
         mode: ResponseMode,
         options: &SessionOptions,
-        requested_auth: &mut Option<digest_auth::WwwAuthenticateHeader>,
+        requested_auth: &mut Option<digest_access::DigestAccess>,
         req: &mut rtsp_types::Request<Bytes>,
     ) -> Result<(RtspMessageContext, u32, rtsp_types::Response<Bytes>), Error> {
         loop {
@@ -855,7 +855,8 @@ impl RtspConnection {
                             .to_owned(),
                     })
                 }
-                let www_authenticate = digest_auth::WwwAuthenticateHeader::parse(www_authenticate)
+                let www_authenticate = www_authenticate
+                    .parse::<digest_access::DigestAccess>()
                     .map_err(|e| {
                         wrap!(ErrorInt::RtspResponseError {
                             conn_ctx: *self.inner.ctx(),
@@ -889,7 +890,7 @@ impl RtspConnection {
     fn fill_req(
         &mut self,
         options: &SessionOptions,
-        requested_auth: &mut Option<digest_auth::WwwAuthenticateHeader>,
+        requested_auth: &mut Option<digest_access::DigestAccess>,
         req: &mut rtsp_types::Request<Bytes>,
     ) -> Result<u32, Error> {
         let cseq = self.next_cseq;
@@ -899,22 +900,15 @@ impl RtspConnection {
                 .creds
                 .as_ref()
                 .expect("creds were checked when filling request_auth");
-            let uri = req.request_uri().map(|u| u.as_str()).unwrap_or("*");
-            let method = digest_auth::HttpMethod(Cow::Borrowed(req.method().into()));
-            let ctx = digest_auth::AuthContext::new_with_method(
-                &creds.username,
-                &creds.password,
-                uri,
-                Option::<&'static [u8]>::None,
-                method,
-            );
 
-            // digest_auth's comments seem to say 'respond' failing means a parser bug.
-            let authorization = auth
-                .respond(&ctx)
-                .map_err(|e| wrap!(ErrorInt::Internal(e.into())))?
-                .to_string();
-            req.insert_header(rtsp_types::headers::AUTHORIZATION, authorization);
+            let uri = req.request_uri().map(|u| u.as_str()).unwrap_or("*");
+            let method = req.method().into();
+            auth.set_username(&creds.username);
+            auth.set_password(&creds.password);
+
+            if let Some(authorization) = auth.generate_authorization(method, uri, None, None) {
+                req.insert_header(rtsp_types::headers::AUTHORIZATION, authorization);
+            }
         }
         req.insert_header(rtsp_types::headers::CSEQ, cseq.to_string());
         if let Some(ref u) = options.user_agent {
