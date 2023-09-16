@@ -73,9 +73,13 @@ fn h264_aac<F: FnMut(CodecItem)>(mut f: F) {
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut g = c.benchmark_group("depacketize");
+    #[cfg(target_os = "windows")]
+    const NULL_FILE: &str = "NUL";
+    #[cfg(not(target_os = "windows"))]
+    const NULL_FILE: &str = "/dev/null";
     let mut w = std::fs::OpenOptions::new()
         .write(true)
-        .open("NUL")
+        .open(NULL_FILE)
         .unwrap();
     let w = &mut w;
     g.throughput(criterion::Throughput::Bytes(
