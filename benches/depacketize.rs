@@ -75,7 +75,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut g = c.benchmark_group("depacketize");
     let mut w = std::fs::OpenOptions::new()
         .write(true)
-        .open("/dev/null")
+        .open("NUL")
         .unwrap();
     let w = &mut w;
     g.throughput(criterion::Throughput::Bytes(
